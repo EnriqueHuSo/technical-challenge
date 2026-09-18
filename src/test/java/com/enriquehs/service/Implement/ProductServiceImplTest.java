@@ -1,6 +1,7 @@
 package com.enriquehs.service.Implement;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -18,12 +19,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.enriquehs.dto.CreateProductRequest;
 import com.enriquehs.dto.ProductDTO;
+import com.enriquehs.error.NoContentException;
 import com.enriquehs.error.ProductNotFoundException;
 import com.enriquehs.mapper.ProductMapper;
 import com.enriquehs.model.Product;
 import com.enriquehs.repository.IProductRepository;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -59,11 +63,50 @@ class ProductServiceImplTest {
     }
 
     @Test
+    void findAll_whenProductsExist_returnsDtos() {
+        when(productRepo.findAll()).thenReturn(Flux.just(product));
+        when(productMapper.toDto(product)).thenReturn(dto);
+
+        StepVerifier.create(productService.findAll())
+                .expectNext(dto)
+                .verifyComplete();
+    }
+
+    @Test
+    void findAll_whenNoProductsExist_throwsNoContentException() {
+        when(productRepo.findAll()).thenReturn(Flux.empty());
+
+        StepVerifier.create(productService.findAll())
+                .expectErrorSatisfies(error -> {
+                    assertThat(error)
+                            .isInstanceOf(NoContentException.class)
+                            .hasMessage("No se encontraron productos");
+                })
+                .verify();
+    }
+
+    @Test
     void findById_whenProductExists_returnsDto() {
         when(productRepo.findById(1L)).thenReturn(Mono.just(product));
         when(productMapper.toDto(product)).thenReturn(dto);
 
         StepVerifier.create(productService.findById(1L))
+                .expectNext(dto)
+                .verifyComplete();
+    }
+
+    @Test
+    void create_whenRequestIsValid_returnsCreatedDto() {
+        CreateProductRequest request = new CreateProductRequest("Laptop", new BigDecimal("1500.00"));
+        Product createdEntity = new Product();
+        createdEntity.setName("Laptop");
+        createdEntity.setPrice(new BigDecimal("1500.00"));
+        createdEntity.setCreatedAt(Instant.now());
+
+        when(productRepo.save(any(Product.class))).thenReturn(Mono.just(createdEntity));
+        when(productMapper.toDto(createdEntity)).thenReturn(dto);
+
+        StepVerifier.create(productService.create(request))
                 .expectNext(dto)
                 .verifyComplete();
     }
@@ -76,7 +119,7 @@ class ProductServiceImplTest {
                 .expectErrorSatisfies(error -> {
                     assertThat(error)
                             .isInstanceOf(ProductNotFoundException.class)
-                            .hasMessage("Product not found with id: 999");
+                            .hasMessage("Producto no encontrado con id: 999");
                 })
                 .verify();
     }
@@ -122,7 +165,7 @@ class ProductServiceImplTest {
                 .expectErrorSatisfies(error -> {
                     assertThat(error)
                             .isInstanceOf(ProductNotFoundException.class)
-                            .hasMessage("Product not found with id: 999");
+                            .hasMessage("Producto no encontrado con id: 999");
                 })
                 .verify();
     }
@@ -144,7 +187,7 @@ class ProductServiceImplTest {
                 .expectErrorSatisfies(error -> {
                     assertThat(error)
                             .isInstanceOf(ProductNotFoundException.class)
-                            .hasMessage("Product not found with id: 999");
+                            .hasMessage("Producto no encontrado con id: 999");
                 })
                 .verify();
     }
